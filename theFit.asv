@@ -1,0 +1,91 @@
+classdef theFit < audioPlugin
+    %-----------------------------------------------------------------------
+    % Public Properties - End user interacts with these
+    %-----------------------------------------------------------------------
+    properties
+        
+    end
+    
+    %-----------------------------------------------------------------------
+    % Private Properties - Used for internal storage
+    %-----------------------------------------------------------------------
+    properties (Access = private)
+        asym_n = 1;
+        asym_p = 1;
+        Ra = 1000;
+        R6 = 51e3;
+        R4 = 4.7e3;
+        R5 = 10e3;
+        C4 = 51e-12;
+        C3 = .047e-6;
+        Voff = 4.5;
+        prec = 1e-6;
+        maxIter = 50;
+        R = 1000;
+        Vt = 0.026;
+        eta = 1;
+        Is = 10^-12;
+        Ts = 1/Fs;
+        localMax = zeros(10, 2);
+        Is_neg = Is / (asym_n * eta * Vt);
+        Is_pos = Is / (asym_p * eta * Vt);
+        %Set initial state variables
+        b0 = 0.5;
+        b1 = 0.5;
+        a1 = 0.1;
+        x = 0;
+        xhold = zeros(1, 1);
+        yhold = zeros(1, 1);
+        g = 0.5;
+    end
+    
+    %-----------------------------------------------------------------------
+    % Constant Properties - Used to define plugin interface
+    %-----------------------------------------------------------------------
+    properties (Constant)
+        PluginInterface = audioPluginInterface( ...
+            audioPluginParameter('Cutoff', ...
+            'Label','Hz', ...
+            'Mapping',{'log',20,2000}));
+    end
+    
+    methods
+        %-------------------------------------------------------------------
+        % Main processing function
+        %-------------------------------------------------------------------
+        function y = process(plugin,x)
+            [N, channels] = size(x)
+            
+            [y,plugin.State] = filter(plugin.B,plugin.A,x,plugin.State);
+        end
+        
+        %-------------------------------------------------------------------
+        % Set Method
+        %-------------------------------------------------------------------
+        function set.Cutoff(plugin,val)
+            plugin.Cutoff = val;
+            [plugin.B,plugin.A] = highpassCoeffs(plugin,val,getSampleRate(plugin)); % <<<< warning occurs here
+        end
+        
+        %-------------------------------------------------------------------
+        % Reset Method
+        %-------------------------------------------------------------------
+        function reset(plugin)
+            plugin.State = zeros(2);
+            [plugin.B,plugin.A] = highpassCoeffs(plugin,plugin.Cutoff,getSampleRate(plugin)); 
+        end
+    end
+    methods (Access = private)
+        %-------------------------------------------------------------------
+        % Calculate Filter Coefficients
+        %-------------------------------------------------------------------
+        function [B,A] = highpassCoeffs(~,fc,fs)
+            w0    = 2*pi*fc/fs;
+            alpha = sin(w0)/sqrt(2);
+            cosw0 = cos(w0);
+            norm  = 1/(1+alpha);
+            B     = (1 + cosw0)*norm * [.5 -1 .5];
+            A     = [1 -2*cosw0*norm (1 - alpha)*norm];
+        end
+    end
+end
