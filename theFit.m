@@ -70,7 +70,7 @@ classdef theFit < audioPlugin
                 'Mapping',{'lin',0,4}),...
             audioPluginParameter('drive', ...
                 'Label','gain', ...
-                'Mapping',{'log',0.000001,6}),...
+                'Mapping',{'log',0.000001,6})...
                 );
         end
     
@@ -78,21 +78,41 @@ classdef theFit < audioPlugin
         %-------------------------------------------------------------------
         % Main processing function
         %-------------------------------------------------------------------
-        function y = process(self, x)
+        function Vout = process(self, Vin)
             [N, channels] = size(x);
+            Vout = zeros(N, channels);
             %Retrieve private variable to use locally in loop
             Is_neg = self.Is_neg;
             Is_pos = self.Is_pos;
-            
+            eta = self.eta;
+            Vt = self.Vt;
+            x = self.x;
+            R = self.R;
+            Is = self.Is;
+            b0 = self.b0;
+            b1 = self.b1;
+            a1 = self.a1; 
+            maxIter = self.maxIter;
+            prec = self.prec;
+            for c = 1:channels
+                for n = 1:N
+                    i = 1;          %positive diode                                                             %negative diode
+                    fx = x/R + Is * (exp(x/(asym_p * eta*Vt))-1) - Vin(n,channel)/R + -Vout(n,channel)/R - Is * (exp(-x/(asym_n*eta*Vt))-1);
+                    %Solve for voltage at each sample
+                    while(i < maxIter && (abs(fx)> prec))
+                        %Take dirivitive to and solve using newton raphson method
+                        den = 1/R + Is_pos * (exp(x/(asym_p * eta*Vt)))+ Is_neg * (exp(-x/(asym_n*eta*Vt)));
+                        x = x - (fx/den);
+                        i = i + 1;
+                        fx = x/R + Is * (exp(x/(asym_p * eta*Vt))-1) - Vin(n,channel)/R + -Vout(n,channel)/R - Is * (exp(-x/(asym_n*eta*Vt))-1);
+                    end
+                    Vout(n,channel) =  b0 * x + b1 * xhold - a1 * yhold;
+                    %update state variables
+                    yhold = Vout(n, channel);
+                    xhold = x;
+                end
+            end
         end
-        
-        %-------------------------------------------------------------------
-        % Set Method
-        %-------------------------------------------------------------------
-        function set.Cutoff(self, val)
-            
-        end
-        
         %-------------------------------------------------------------------
         % Reset Method
         %-------------------------------------------------------------------
@@ -100,28 +120,28 @@ classdef theFit < audioPlugin
             self.plocalMax = zeros(10, 2);
             self.pHarms = zeros(7,1);
             self.pPDiodes = 1;
-            self.pNDiodes = setDiodes(self, ;
+            self.pNDiodes = 1;
         end
         %-------------------------------------------------------------------
         % Set Methods for Harmonics
         %-------------------------------------------------------------------
         function set.second(self, in)
-            setDiodes(2);
+            self.setDiodes(2);
         end
         function set.third(self, in)
-            setDiodes(3);
+            self.setDiodes(3);
         end
         function set.fourth(self, in)
-            setDiodes(4);
+            self.setDiodes(4);
         end
         function set.fifth(self, in)
-            setDiodes(5);
+            self.setDiodes(5);
         end
         function set.sixth(self, in)
-            setDiodes(6);
+            self.setDiodes(6);
         end
         function set.seventh(self, in)
-            setDiodes(7);
+            self.setDiodes(7);
         end
     end
     methods (Access = private)
@@ -155,7 +175,6 @@ classdef theFit < audioPlugin
             if self.pPDiodes < self.pNDiodes
                 swapNumDiodes(self);
             end
-            setAssym(self, neg, pos);
         end
         %-------------------------------------------------------------------
         % 
@@ -164,8 +183,6 @@ classdef theFit < audioPlugin
             if self.pPDiodes < self.pNDiodes
                 swapNumDiodes(self);
             end
-            setAssym(self, neg, pos);
-            setAssym(self, neg, pos);
         end
         %-------------------------------------------------------------------
         % 
@@ -174,8 +191,6 @@ classdef theFit < audioPlugin
             if self.pPDiodes < self.pNDiodes
                 swapNumDiodes(self);
             end
-            setAssym(self, neg, pos);
-            setAssym(self, neg, pos);
         end
         %-------------------------------------------------------------------
         % 
@@ -184,8 +199,6 @@ classdef theFit < audioPlugin
             if self.pPDiodes < self.pNDiodes
                 swapNumDiodes(self);
             end
-            setAssym(self, neg, pos);
-            setAssym(self, neg, pos);
         end
         %-------------------------------------------------------------------
         % 
@@ -194,8 +207,6 @@ classdef theFit < audioPlugin
             if self.pPDiodes < self.pNDiodes
                 swapNumDiodes(self);
             end
-            setAssym(self, neg, pos);
-            setAssym(self, neg, pos);
         end
         %-------------------------------------------------------------------
         % 
@@ -204,8 +215,6 @@ classdef theFit < audioPlugin
             if self.pPDiodes < self.pNDiodes
                 swapNumDiodes(self);
             end
-            setAssym(self, neg, pos);
-            setAssym(self, neg, pos);
         end
         %-------------------------------------------------------------------
         % Set Diodes, helper function, calls each of the harms function
@@ -227,6 +236,13 @@ classdef theFit < audioPlugin
                 otherwise
                     return;
             end
+        end
+        %-------------------------------------------------------------------
+        % 
+        %-------------------------------------------------------------------
+        function [] = setHold(self, xhold, yhold)
+            self.xhold = xhold;
+            self.yhold = yhold;
         end
         %-------------------------------------------------------------------
         % Calculate local fft peaks
