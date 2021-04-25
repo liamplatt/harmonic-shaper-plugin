@@ -4,8 +4,6 @@ classdef theFit < audioPlugin
     %-----------------------------------------------------------------------
     properties (Access = private)
         %Modeling characteristics
-        asym_n = 1;
-        asym_p = 1;
         Ra = 1000;
         R6 = 51e3;
         R4 = 4.7e3;
@@ -18,10 +16,9 @@ classdef theFit < audioPlugin
         Vt = 0.026;
         eta = 1;
         Is = 10^-12;
-        Ts = 1/Fs;
         localMax = zeros(10, 2);
-        Is_neg = Is / (asym_n * eta * Vt);
-        Is_pos = Is / (asym_p * eta * Vt);
+        Is_neg; 
+        Is_pos;
         %Set initial state variables
         b0 = 0.5;
         b1 = 0.5;
@@ -70,7 +67,10 @@ classdef theFit < audioPlugin
                 'Mapping',{'lin',0,4}),...    
             audioPluginParameter('seventh', ...
                 'Label','7th Harm', ...
-                'Mapping',{'lin',0,4})...
+                'Mapping',{'lin',0,4}),...
+            audioPluginParameter('drive', ...
+                'Label','gain', ...
+                'Mapping',{'log',0.000001,6}),...
                 );
         end
     
@@ -97,29 +97,31 @@ classdef theFit < audioPlugin
         % Reset Method
         %-------------------------------------------------------------------
         function reset(self)
-            
-            
+            self.plocalMax = zeros(10, 2);
+            self.pHarms = zeros(7,1);
+            self.pPDiodes = 1;
+            self.pNDiodes = setDiodes(self, ;
         end
         %-------------------------------------------------------------------
         % Set Methods for Harmonics
         %-------------------------------------------------------------------
         function set.second(self, in)
-            setDiodes('2');
+            setDiodes(2);
         end
         function set.third(self, in)
-            setDiodes('3');
+            setDiodes(3);
         end
         function set.fourth(self, in)
-            setDiodes('4');
+            setDiodes(4);
         end
         function set.fifth(self, in)
-            setDiodes('5');
+            setDiodes(5);
         end
         function set.sixth(self, in)
-            setDiodes('6');
+            setDiodes(6);
         end
         function set.seventh(self, in)
-            setDiodes('7');
+            setDiodes(7);
         end
     end
     methods (Access = private)
@@ -130,22 +132,101 @@ classdef theFit < audioPlugin
             [B, A] = iirnotch(fc/fs, .01, 3); 
         end
         %-------------------------------------------------------------------
-        % Interpret user settings
+        % Set function for private props pPDiodes pNDiodes
         %-------------------------------------------------------------------
-        function [] = setDiodes(self, numDiode)
-            if(in ~= self.NDiodes)
-                return
-            else
-                %If there are more neg diodes then pos diodes
-                %
-                if(in > self.PDiodes)
-                    
-                %If there are more pos diodes then neg diodes   
-                elseif(in < self.PDiodes)
-                        
-                end
+        function [] = setAssym(self, neg, pos)
+           self.pPDiodes = pos;
+           self.pNDiodes = neg;
+           reset(self);
+        end
+        %-------------------------------------------------------------------
+        % Helper function for swapping properties
+        %-------------------------------------------------------------------
+        function [] = swapNumDiodes(self)
+            temp = self.pNDiodes;
+            self.pNDiodes = self.pPDiodes;
+            self.pPDiodes = temp;
+        end
+        %-------------------------------------------------------------------
+        % Pos=Even Neg=Odd
+        %-------------------------------------------------------------------
+        function [] = setTwo(self)
+            %Take into count current assymp and assymneg
+            if self.pPDiodes < self.pNDiodes
+                swapNumDiodes(self);
             end
-            
+            setAssym(self, neg, pos);
+        end
+        %-------------------------------------------------------------------
+        % 
+        %-------------------------------------------------------------------
+        function [] = setThree(self)
+            if self.pPDiodes < self.pNDiodes
+                swapNumDiodes(self);
+            end
+            setAssym(self, neg, pos);
+            setAssym(self, neg, pos);
+        end
+        %-------------------------------------------------------------------
+        % 
+        %-------------------------------------------------------------------
+        function [] = setFour(self)
+            if self.pPDiodes < self.pNDiodes
+                swapNumDiodes(self);
+            end
+            setAssym(self, neg, pos);
+            setAssym(self, neg, pos);
+        end
+        %-------------------------------------------------------------------
+        % 
+        %-------------------------------------------------------------------
+        function [] = setFive(self)
+            if self.pPDiodes < self.pNDiodes
+                swapNumDiodes(self);
+            end
+            setAssym(self, neg, pos);
+            setAssym(self, neg, pos);
+        end
+        %-------------------------------------------------------------------
+        % 
+        %-------------------------------------------------------------------
+        function [] = setSix(self)
+            if self.pPDiodes < self.pNDiodes
+                swapNumDiodes(self);
+            end
+            setAssym(self, neg, pos);
+            setAssym(self, neg, pos);
+        end
+        %-------------------------------------------------------------------
+        % 
+        %-------------------------------------------------------------------
+        function [] = setSeven(self)
+            if self.pPDiodes < self.pNDiodes
+                swapNumDiodes(self);
+            end
+            setAssym(self, neg, pos);
+            setAssym(self, neg, pos);
+        end
+        %-------------------------------------------------------------------
+        % Set Diodes, helper function, calls each of the harms function
+        %-------------------------------------------------------------------
+        function [] = setDiodes(self, numHarm)
+            switch numHarm
+                case 2
+                    setTwo(self);
+                case 3
+                    setThree(self);
+                case 4
+                    setFour(self);
+                case 5
+                    setFive(self);
+                case 6
+                    setSix(self);
+                case 7
+                    setSeven(self);
+                otherwise
+                    return;
+            end
         end
         %-------------------------------------------------------------------
         % Calculate local fft peaks
@@ -176,7 +257,6 @@ classdef theFit < audioPlugin
             currMaxAmp = -inf;
             found = false;
             for i = 1:10
-
                 if self.localMax(i, 2) > currMaxAmp
                     currMaxAmp = self.localMax(i, 2);
                     currMaxFreq = self.localMax(i, 1);
@@ -184,11 +264,11 @@ classdef theFit < audioPlugin
             end
             for i = 1:10
                 if found
-                    self.harms(j) = self.localMax(i, 1);
+                    self.pHarms(j) = self.localMax(i, 1);
                     j = j + 1;
                 end
                 if currMaxFreq == self.localMax(i, 1)
-                    self.harms(1) = currMaxFreq;
+                    self.pHarms(1) = currMaxFreq;
                     found = true;
                     j = 2;
                 end
