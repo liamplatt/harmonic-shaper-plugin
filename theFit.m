@@ -15,7 +15,7 @@ classdef theFit < audioPlugin
         maxIter = 50;
         Vt = 0.026;
         eta = 1;
-        Is = 10^-9;
+        Is = 10^-12;
         localMax = zeros(10, 2);
         Is_neg = 0; 
         Is_pos = 0;
@@ -24,8 +24,6 @@ classdef theFit < audioPlugin
         xhold = [0, 0; 0, 0];
         yhold = [0, 0; 0, 0];
         g = 0.5;
-        eqOn = true;
-        pBins = [20,39, 40,79, 80,159, 160,319, 320,639, 640 1279 1280 2559 2560 5119  5120 10239 10240 20000];
         plocalMax = zeros(10, 2);
         pHarms = zeros(7,1);
         pPDiodes = 2;
