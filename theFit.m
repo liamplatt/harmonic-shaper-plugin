@@ -15,7 +15,7 @@ classdef theFit < audioPlugin
         maxIter = 50;
         Vt = 0.026;
         eta = 1;
-        Is = 10^-12;
+        Is = 10^-9;
         localMax = zeros(10, 2);
         Is_neg = 0; 
         Is_pos = 0;
@@ -24,6 +24,8 @@ classdef theFit < audioPlugin
         xhold = [0, 0; 0, 0];
         yhold = [0, 0; 0, 0];
         g = 0.5;
+        eqOn = true;
+        pBins = [20,39, 40,79, 80,159, 160,319, 320,639, 640 1279 1280 2559 2560 5119  5120 10239 10240 20000];
         plocalMax = zeros(10, 2);
         pHarms = zeros(7,1);
         pPDiodes = 2;
@@ -43,6 +45,8 @@ classdef theFit < audioPlugin
         isSetup = false;
         channels = 2;
         builtFilter = true;
+        gainMemory = 1;                         %%%%%%%%%
+        gainLinear = 1;                         %%%%%%%%%
     end
     %-----------------------------------------------------------------------
     % Public Properties - End user interacts with these
@@ -55,12 +59,16 @@ classdef theFit < audioPlugin
         sixth = 1;
         seventh = 1;
         drive = 1;
+        outputGain = 0;                         %%%%%%%%%
     end
     %-----------------------------------------------------------------------
     % Constant Properties - Used to define plugin interface
     %-----------------------------------------------------------------------
     properties (Constant)
         PluginInterface = audioPluginInterface(...
+            audioPluginParameter('outputGain', ...
+                'Label','Output', ...
+                'Mapping',{'pow',1/3,-60,0}),...
             audioPluginParameter('second', ...
                 'Label','2nd Harm', ...
                 'Mapping',{'lin',0,4}),...
@@ -89,7 +97,7 @@ classdef theFit < audioPlugin
         %-------------------------------------------------------------------
         % Main processing function
         %-------------------------------------------------------------------
-        function Vout = process(self, Vin)
+        function Vout = process(self, Vin)       
             [N, channels] = size(Vin);
             Vout = zeros(N, channels);
             if self.channels ~= channels
@@ -160,6 +168,22 @@ classdef theFit < audioPlugin
             end
         end
         %-------------------------------------------------------------------
+        % Output Gain Method                       %%%%%%%%%
+        %-------------------------------------------------------------------
+        function out = gainMethod(plugin, val)
+            gain = 0.5*(plugin.gainLinear + plugin.gainMemory);
+            out = val*gain;
+            
+            plugin.gainMemory = gain
+        end
+        %-------------------------------------------------------------------
+        % Output Gain Operation                    %%%%%%%%%
+        %-------------------------------------------------------------------
+        function set.outputGain(plugin, val)
+            plugin.outputGain = val;
+            plugin.gainLinear = 10^(val/20);
+        end
+        %-------------------------------------------------------------------
         % Reset Method
         %-------------------------------------------------------------------
         function reset(self)
@@ -169,6 +193,7 @@ classdef theFit < audioPlugin
             self.pPDiodes = 1;
             self.pNDiodes = 1;
             self.isSetup = false;
+            self.gainMemory = 1;
         end
         %-------------------------------------------------------------------
         % Set Methods for Harmonics
